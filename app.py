@@ -1,180 +1,213 @@
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-from sqlalchemy import text
+import React, { useState, useEffect } from 'react';
+import { Trash2, CheckCircle, XCircle, Package } from 'lucide-react'; // Instale caso não tenha: npm install lucide-react
 
-# 1. Configuração do Sistema e Layout Responsivo
-st.set_page_config(layout="wide", page_title="DTF EXPRESS - Sistema de Gestão", page_icon="🖨️")
+export default function GestaoDTF() {
+  const [vendas, setVendas] = useState([]);
+  const [buscaCliente, setBuscaCliente] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('Todos');
 
-# CSS Avançado para a Interface Profissional do DTF EXPRESS
-st.markdown("""
-    <style>
-    .main, .stApp { background-color: #ffffff !important; }
-    div[data-testid="stForm"] {
-        background-color: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 6px !important;
-        padding: 24px !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+  // Formular Novo Lançamento
+  const [novoLancamento, setNovoLancamento] = useState({
+    cliente: '',
+    produto: '',
+    valor: '',
+    dtfPronto: false,
+    statusPagamento: 'Não Pago'
+  });
+
+  // Função para salvar nova venda (Simulação da API conectada ao Neon via GitHub)
+  const handleSalvarVenda = async (e) => {
+    e.preventDefault();
+    if (!novoLancamento.cliente || !novoLancamento.produto || !novoLancamento.valor) return;
+
+    const novaVenda = {
+      id: Date.now(), // No Neon será o SERIAL ID
+      data: new Date().toLocaleDateString('pt-BR'),
+      ...novoLancamento,
+      valor: parseFloat(novoLancamento.valor)
+    };
+
+    setVendas([novaVenda, ...vendas]);
+    // Resetar campos essenciais mantendo o cliente se quiser lançar vários itens
+    setNovoLancamento({ ...novoLancamento, produto: '', valor: '', dtfPronto: false, statusPagamento: 'Não Pago' });
+  };
+
+  // Função para Deletar Registro (Ação da Lixeira)
+  const handleExcluir = async (id) => {
+    if (window.confirm("Tem certeza que deseja excluir este registro?")) {
+      setVendas(vendas.filter(venda => venda.id !== id));
+      // Aqui você adicionará o fetch('/api/vendas/' + id, { method: 'DELETE' })
     }
-    input, select, .stSelectbox div[data-baseweb="select"] {
-        border-radius: 4px !important;
-        border: 1px solid #cbd5e1 !important;
-        height: 38px !important;
-    }
-    .metric-container { display: flex; gap: 20px; margin-bottom: 25px; }
-    .metric-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px 25px; border-radius: 6px; flex: 1; }
-    .metric-title { font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-    .metric-value { font-size: 24px; color: #0f172a; font-weight: 700; margin-top: 5px; }
-    button[data-baseweb="tab"] { font-size: 14px !important; font-weight: 600 !important; color: #64748b !important; }
-    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-block; margin-right: 5px; margin-bottom: 2px; }
-    .badge-success { background-color: #dcfce7; color: #15803d; }
-    .badge-danger { background-color: #fee2e2; color: #b91c1c; }
-    .badge-warning { background-color: #fef9c3; color: #a16207; }
-    .badge-info { background-color: #e0f2fe; color: #0369a1; }
-    </style>
-""", unsafe_allow_html=True)
+  };
 
-st.markdown("<h2 style='color:#0f172a; margin-bottom:2px; font-weight:700;'>🖨️ DTF EXPRESS — Painel de Controle</h2>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748b; font-size:13px; margin-bottom:25px;'>Módulo Profissional de Gestão Operacional e Financeira</p>", unsafe_allow_html=True)
+  // Alternar Status de Pagamento com um clique
+  const alternarPagamento = (id) => {
+    setVendas(vendas.map(v => v.id === id ? { ...v, statusPagamento: v.statusPagamento === 'Pago' ? 'Não Pago' : 'Pago' } : v));
+  };
 
-# 2. Conexão com o Banco de Dados Real (PostgreSQL)
-conn = st.connection("postgresql", type="sql")
+  // Alternar Status de Retirada/Pronto com um clique
+  const alternarRetirada = (id) => {
+    setVendas(vendas.map(v => v.id === id ? { ...v, dtfPronto: !v.dtfPronto } : v));
+  };
 
-# --- FUNÇÕES ISOLADAS PARA EVITAR ERROS DE INDENTAÇÃO ---
-def executar_comando(query_texto, parametros):
-    with conn.session as session:
-        session.execute(text(query_texto), parametros)
-        session.commit()
+  // Filtragem Dinâmica de Clientes e Status
+  const vendasFiltradas = vendas.filter(venda => {
+    const bateCliente = venda.cliente.toLowerCase().includes(buscaCliente.toLowerCase());
+    const bateStatus = filtroStatus === 'Todos' || venda.statusPagamento === filtroStatus;
+    return bateCliente && bateStatus;
+  });
 
-def buscar_pedidos():
-    return conn.query("SELECT id, data, cliente, metros, valor_total, dtf_pronto, pago, retirou, desconto, acrescimo FROM pedidos ORDER BY id DESC;", ttl=0)
+  // Cálculos de Caixa do Filtro Atual
+  const totalDevido = vendasFiltradas.filter(v => v.statusPagamento === 'Não Pago').reduce((acc, v) => acc + v.valor, 0);
+  const totalFaturadoDia = vendas.filter(v => v.data === new Date().toLocaleDateString('pt-BR')).reduce((acc, v) => acc + v.valor, 0);
 
-def buscar_clientes():
-    return conn.query("SELECT nome FROM clientes ORDER BY nome ASC;", ttl=0)
-
-def buscar_servicos():
-    return conn.query("SELECT nome, preco_base FROM servicos ORDER BY nome ASC;", ttl=0)
-
-# Carregamento dos dados seguros
-df_pedidos = buscar_pedidos()
-df_clientes_db = buscar_clientes()
-df_servicos_db = buscar_servicos()
-
-lista_clientes = ["Selecionar Cliente..."] + list(df_clientes_db["nome"].unique()) if not df_clientes_db.empty else ["Nenhum cliente cadastrado"]
-lista_servicos = ["Selecionar Serviço..."] + list(df_servicos_db["nome"].unique()) if not df_servicos_db.empty else ["Nenhum serviço cadastrado"]
-
-# 3. Blocos Financeiros Superiores
-hoje = datetime.now().date()
-mes_atual = hoje.month
-ano_atual = hoje.year
-
-if not df_pedidos.empty:
-    df_pedidos["data"] = pd.to_datetime(df_pedidos["data"]).dt.date
-    vendas_hoje = df_pedidos[df_pedidos["data"] == hoje]["valor_total"].sum()
-    vendas_mes = df_pedidos[(pd.to_datetime(df_pedidos["data"]).dt.month == mes_atual) & (pd.to_datetime(df_pedidos["data"]).dt.year == ano_atual)]["valor_total"].sum()
-else:
-    vendas_hoje, vendas_mes = 0.0, 0.0
-
-st.markdown(f"""
-    <div class='metric-container'>
-        <div class='metric-box'>
-            <div class='metric-title'>📊 Faturamento Diário (Hoje)</div>
-            <div class='metric-value'>R$ {vendas_hoje:,.2f}</div>
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen font-sans">
+      {/* 📊 Cabeçalho de Indicadores */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <p className="text-gray-500 text-xs font-bold uppercase">Faturamento Diário (Hoje)</p>
+          <p className="text-2xl font-bold text-green-600">R$ {totalFaturadoDia.toFixed(2)}</p>
         </div>
-        <div class='metric-box'>
-            <div class='metric-title'>📈 Total Acumulado do Mês</div>
-            <div class='metric-value'>R$ {vendas_mes:,.2f}</div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <p className="text-gray-500 text-xs font-bold uppercase">Extrato Mensal</p>
+          <button className="mt-1 px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition">
+            Ver Relatório Mensal
+          </button>
         </div>
-    </div>
-""", unsafe_allow_html=True)
+      </div>
 
-# 4. Navegação pelas Abas Organizadas
-aba_vendas, aba_extratos, aba_clientes, aba_servicos, aba_historico = st.tabs([
-    "🛒 Itens do Pedido de Venda", "📊 Extratos Mensais", "👤 Cadastro de Clientes", "🛍️ Cadastro de Serviços/Preços", "📜 Histórico Geral"
-])
+      {/* 📝 Formulário de Novo Lançamento de Venda */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-700">Novo Lançamento de Venda</h2>
+        <form onSubmit={handleSalvarVenda} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Cliente *</label>
+            <input 
+              type="text" 
+              placeholder="Nome do cliente"
+              className="w-full p-2 border rounded text-sm"
+              value={novoLancamento.cliente}
+              onChange={e => setNovoLancamento({...novoLancamento, cliente: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Produto / Tabela DTF *</label>
+            <select 
+              className="w-full p-2 border rounded text-sm"
+              value={novoLancamento.produto}
+              onChange={e => setNovoLancamento({...novoLancamento, produto: e.target.value})}
+            >
+              <option value="">Selecione o DTF</option>
+              <option value="DTF Metro Linear - Tabela A">DTF Metro Linear - Tabela A</option>
+              <option value="DTF Metro Linear - Tabela B">DTF Metro Linear - Tabela B</option>
+              <option value="DTF Imagem Avulsa">DTF Imagem Avulsa</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$) *</label>
+            <input 
+              type="number" 
+              step="0.01"
+              placeholder="0,00"
+              className="w-full p-2 border rounded text-sm"
+              value={novoLancamento.valor}
+              onChange={e => setNovoLancamento({...novoLancamento, valor: e.target.value})}
+            />
+          </div>
+          <div className="flex gap-4 mb-2">
+            <label className="flex items-center text-sm gap-1.5 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={novoLancamento.dtfPronto} 
+                onChange={e => setNovoLancamento({...novoLancamento, dtfPronto: e.target.checked})}
+              />
+              DTF Pronto/Retirado
+            </label>
+          </div>
+          <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded font-medium text-sm transition">
+            + Adicionar Item
+          </button>
+        </form>
+      </div>
 
-# --- ABA 1: PEDIDOS E FLUXO DIÁRIO ---
-with aba_vendas:
-    st.markdown("<h4 style='color:#334155; font-size:15px; margin-bottom:15px; font-weight:600;'>📋 Novo Lançamento de Venda</h4>", unsafe_allow_html=True)
-    
-    with st.form("form_dtf_pedido", clear_on_submit=True):
-        c_cli, c_vend, c_loja, c_uni = st.columns([2.5, 1.5, 1.5, 1.5])
-        cliente_sel = c_cli.selectbox("Cliente *", lista_clientes)
-        c_vend.selectbox("Vendedor", ["Nenhum Vendedor", "Balcão", "Produção"])
-        c_loja.selectbox("Loja", ["Nenhuma Loja", "Matriz"])
-        c_uni.selectbox("Unidade de negócio", ["Nenhuma unidade de negócio"])
-            
-        c_serv, c_qtd, c_desc, c_acre = st.columns([2.5, 1.5, 1.5, 1.5])
-        servico_sel = c_serv.selectbox("Descrição / Serviço *", lista_servicos)
-        metros = c_qtd.number_input("Quantidade (m ou un)", min_value=0.1, step=0.1, value=1.0)
-        desconto = c_desc.number_input("Desc (R$)", min_value=0.0, step=0.5, value=0.0)
-        acrescimo = c_acre.number_input("Acréscimo / Taxa (R$)", min_value=0.0, step=0.5, value=0.0)
-            
-        btn_salvar = st.form_submit_button("＋ Adicionar Item")
-            
-        if btn_salvar:
-            if cliente_sel == "Selecionar Cliente..." or servico_sel == "Selecionar Serviço...":
-                st.error("Por favor, selecione um Cliente e um Serviço cadastrados antes.")
-            else:
-                preco_base = float(df_servicos_db[df_servicos_db["nome"] == servico_sel]["preco_base"].values)
-                valor_total = float((metros * preco_base) + acrescimo - desconto)
-                if valor_total < 0: valor_total = 0.0
-                
-                q_insert = "INSERT INTO pedidos (data, cliente, metros, valor_total, dtf_pronto, pago, retirou, desconto, acrescimo) VALUES (:dt, :cli, :met, :val, false, false, false, :desc, :acre);"
-                p_insert = {"dt": hoje, "cli": str(cliente_sel), "met": float(metros), "val": float(valor_total), "desc": float(desconto), "acre": float(acrescimo)}
-                executar_comando(q_insert, p_insert)
-                st.success("Pedido adicionado à fila!")
-                st.rerun()
-
-    st.markdown("---")
-    st.markdown("<h4 style='color:#334155; font-size:15px; font-weight:600; margin-bottom:15px;'>📋 Fila de Pedidos Ativos</h4>", unsafe_allow_html=True)
-    
-    c_pesq, c_flt = st.columns(2)
-    pesquisa = c_pesq.text_input("🔍 Procurar por Cliente", placeholder="Digite o nome do cliente...")
-    filtro_status = c_flt.selectbox("Status Financeiro", ["Todos os Pedidos", "Apenas Não Pagos", "Apenas Pagos"])
-
-    df_ativos = df_pedidos[~((df_pedidos["pago"] == True) & (df_pedidos["retirou"] == True))] if not df_pedidos.empty else df_pedidos
-
-    if pesquisa and not df_ativos.empty:
-        df_ativos = df_ativos[df_ativos["cliente"].str.contains(pesquisa, case=False, na=False)]
-    if filtro_status == "Apenas Não Pagos" and not df_ativos.empty:
-        df_ativos = df_ativos[df_ativos["pago"] == False]
-    elif filtro_status == "Apenas Pagos" and not df_ativos.empty:
-        df_ativos = df_ativos[df_ativos["pago"] == True]
-
-    if not df_ativos.empty:
-        soma_total_filtro = df_ativos["valor_total"].sum()
-        st.markdown(f"<p style='font-size:15px; color:#0284c7; font-weight:700;'>💰 Total Pendente/Localizado nesta Busca: R$ {soma_total_filtro:,.2f}</p>", unsafe_allow_html=True)
+      {/* 🔍 Área de Busca e Fila de Pedidos */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <h2 className="text-lg font-bold mb-4 text-gray-700">Fila de Pedidos e Histórico</h2>
         
-        for idx, row in df_ativos.iterrows():
-            id_p = int(row["id"])
-            lbl_prod = "✨ PRONTO" if row.get("dtf_pronto", False) else "⏳ IMPRIMINDO"
-            cls_prod = "badge-success" if row.get("dtf_pronto", False) else "badge-warning"
-            lbl_pago = "🟢 PAGO" if row["pago"] else "🔴 NÃO PAGO"
-            cls_pago = "badge-success" if row["pago"] else "badge-danger"
-            lbl_ret = "📦 RETIROU" if row["retirou"] else "⏳ PENDENTE"
-            cls_ret = "badge-info" if row["retirou"] else "badge-warning"
+        {/* Filtros */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Procurar por Cliente</label>
+            <input 
+              type="text" 
+              placeholder="Digite o nome do cliente para ver tudo..."
+              className="w-full p-2 border rounded text-sm"
+              value={buscaCliente}
+              onChange={e => setBuscaCliente(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Filtrar Status Financeiro</label>
+            <select 
+              className="w-full p-2 border rounded text-sm"
+              value={filtroStatus}
+              onChange={e => setFiltroStatus(e.target.value)}
+            >
+              <option value="Todos">Todos os Pedidos (Pagos e Não Pagos)</option>
+              <option value="Não Pago">Apenas Não Pagos (Em aberto)</option>
+              <option value="Pago">Apenas Pagos</option>
+            </select>
+          </div>
+          {/* Card Dinâmico de Dívida do Cliente */}
+          {buscaCliente && (
+            <div className="bg-red-50 border border-red-200 p-2.5 rounded flex flex-col justify-center">
+              <span className="text-xs text-red-700 font-bold uppercase">Total Devido por {buscaCliente}:</span>
+              <span className="text-xl font-black text-red-600">R$ {totalDevido.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
 
-            st.markdown(f"👤 **{row['cliente']}** | Total: **R$ {row['valor_total']:,.2f}**")
-            st.markdown(f"<span class='badge {cls_prod}'>{lbl_prod}</span> <span class='badge {cls_pago}'>{lbl_pago}</span> <span class='badge {cls_ret}'>{lbl_ret}</span>", unsafe_allow_html=True)
-            st.markdown(f"<small style='color:gray;'>{row['metros']} un/m | Lançado em: {row['data'].strftime('%d/%m/%Y')} | Desc: R$ {row['desconto']} | Taxa: R$ {row['acrescimo']}</small>", unsafe_allow_html=True)
-            
-            col_b1, col_b2, col_b3, col_dl = st.columns([1, 1, 1, 0.3])
-            
-            if col_b1.button("Alternar DTF", key=f"b1_{id_p}"):
-                executar_comando("UPDATE pedidos SET dtf_pronto = :p WHERE id = :id;", {"p": not row.get("dtf_pronto", False), "id": id_p})
-                st.rerun()
-                
-            if col_b2.button("Alternar Caixa", key=f"b2_{id_p}"):
-                executar_comando("UPDATE pedidos SET pago = :p WHERE id = :id;", {"p": not row["pago"], "id": id_p})
-                st.rerun()
-                
-            if col_b3.button("Alternar Saída", key=f"b3_{id_p}"):
-                executar_comando("UPDATE pedidos SET retirou = :r WHERE id = :id;", {"r": not row["retirou"], "id": id_p})
-                st.rerun()
-                
-            if col_dl.button("🗑️", key=f"dl_{id_p}"):
-                executar_comando("DELETE FROM pedidos WHERE id = :id;", {"id": id_p})
-                st.rerun()
-                
+        {/* 📋 Tabela de Resultados */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-100 text-gray-700 uppercase text-xs border-b">
+                <th className="p-3">Data</th>
+                <th className="p-3">Cliente</th>
+                <th className="p-3">Produto/Tabela DTF</th>
+                <th className="p-3">Valor</th>
+                <th className="p-3 text-center">Entrega/Retirada</th>
+                <th className="p-3 text-center">Status Financeiro</th>
+                <th className="p-3 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vendasFiltradas.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="p-4 text-center text-gray-400">Nenhum registro encontrado.</td>
+                </tr>
+              ) : (
+                vendasFiltradas.map((venda) => (
+                  <tr key={venda.id} className="border-b hover:bg-gray-50 transition">
+                    <td className="p-3 text-gray-500">{venda.data}</td>
+                    <td className="p-3 font-semibold text-gray-800">{venda.cliente}</td>
+                    <td className="p-3 text-gray-600">{venda.produto}</td>
+                    <td className="p-3 font-medium text-gray-900">R$ {venda.valor.toFixed(2)}</td>
+                    
+                    {/* Botão de Retirada Rápida */}
+                    <td className="p-3 text-center">
+                      <button 
+                        onClick={() => alternarRetirada(venda.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1 mx-auto ${
+                          venda.dtfPronto ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        <Package size={14} />
+                        {venda.dtfPronto ? 'Retirado' : 'Pronto p/ Retirar'}
+                      </button>
+                    </td>
+
+                    {/* Botão de Status Financeiro Rápido */}
+                    <td className="p-3 text-center">
+                      <button 
