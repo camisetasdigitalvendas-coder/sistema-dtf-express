@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from sqlalchemy import text  # Correção técnica importando a função text
 
 # 1. Configuração da página para PC e Celular
 st.set_page_config(layout="wide", page_title="Gestão DTF")
@@ -64,7 +65,7 @@ with st.form("formulario_pedido", clear_on_submit=True):
         
         with conn.session as session:
             session.execute(
-                "INSERT INTO pedidos (data, cliente, metros, valor_total, pago, retirou) VALUES (:data, :cliente, :metros, :valor_total, false, false);",
+                text("INSERT INTO pedidos (data, cliente, metros, valor_total, pago, retirou) VALUES (:data, :cliente, :metros, :valor_total, false, false);"),
                 {"data": data_atual, "cliente": cliente, "metros": metros, "valor_total": valor_total}
             )
             session.commit()
@@ -89,7 +90,7 @@ if not df_pedidos.empty:
         with conn.session as session:
             for index, row in pedidos_editados.iterrows():
                 session.execute(
-                    "UPDATE pedidos SET pago = :pago, retirou = :retirou WHERE id = :id;",
+                    text("UPDATE pedidos SET pago = :pago, retirou = :retirou WHERE id = :id;"),
                     {"pago": bool(row["pago"]), "retirou": bool(row["retirou"]), "id": int(row["id"])}
                 )
             session.commit()
