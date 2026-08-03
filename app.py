@@ -141,9 +141,7 @@ with aba_vendas:
         with c_acre:
             acrescimo = st.number_input("Acréscimo / Taxa (R$)", min_value=0.0, step=0.5, value=0.0)
             
-        c_space, c_btn = st.columns([5.5, 1.5])
-        with c_btn:
-            btn_salvar = st.form_submit_button("＋ Adicionar Item", use_container_width=True)
+        btn_salvar = st.form_submit_button("＋ Adicionar Item")
             
         if btn_salvar:
             if cliente_sel == "Selecionar Cliente..." or servico_sel == "Selecionar Serviço...":
@@ -174,7 +172,6 @@ with aba_vendas:
     with c_flt:
         filtro_status = st.selectbox("Status Financeiro", ["Todos os Pedidos", "Apenas Não Pagos", "Apenas Pagos"])
 
-    # Filtra fila ativa (O que não foi pago e retirado ao mesmo tempo)
     df_ativos = df_pedidos[~((df_pedidos["pago"] == True) & (df_pedidos["retirou"] == True))] if not df_pedidos.empty else df_pedidos
 
     if pesquisa and not df_ativos.empty:
@@ -188,7 +185,7 @@ with aba_vendas:
         soma_total_filtro = df_ativos["valor_total"].sum()
         st.markdown(f"<p style='font-size:15px; color:#0284c7; font-weight:700;'>💰 Total Pendente/Localizado nesta Busca: R$ {soma_total_filtro:,.2f}</p>", unsafe_allow_html=True)
         
-        # Grid Operacional com Status e Botões de Controle Lado a Lado
+        # Lista Organizada de Linhas sem colunas aninhadas perigosas
         for idx, row in df_ativos.iterrows():
             id_p = int(row["id"])
             lbl_prod = "✨ PRONTO" if row.get("dtf_pronto", False) else "⏳ IMPRIMINDO"
@@ -200,9 +197,9 @@ with aba_vendas:
             lbl_ret = "📦 RETIROU" if row["retirou"] else "⏳ PENDENTE"
             cls_ret = "badge-info" if row["retirou"] else "badge-warning"
 
-            col_inf, col_bt1, col_bt2, col_bt3, col_st, col_dl = st.columns([2.5, 1.1, 1.1, 1.1, 1.2, 0.3])
+            # Renderiza as informações principais do pedido
+            st.markdown(f"👤 **{row['cliente']}** | Total: **R$ {row['valor_total']:,.2f}**")
+            st.markdown(f"<span class='badge {cls_prod}'>{lbl_prod}</span> <span class='badge {cls_pago}'>{lbl_pago}</span> <span class='badge {cls_ret}'>{lbl_ret}</span>", unsafe_allow_html=True)
+            st.markdown(f"<small style='color:gray;'>{row['metros']} un/m | Lançado em: {row['data'].strftime('%d/%m/%Y')} | Desc: R$ {row['desconto']} | Taxa: R$ {row['acrescimo']}</small>", unsafe_allow_html=True)
             
-            with col_inf:
-                st.markdown(f"👤 **{row['cliente']}**")
-                st.markdown(f"<small style='color:gray;'>{row['metros']} un/m | Desc: R$ {row['desconto']} | Taxa: R$ {row['acrescimo']}</small><br>Total: **R$ {row['valor_total']:,.2f}**", unsafe_allow_html=True)
-            with col_bt1:
+            # Linha de Ações/Botões horizontais simples
