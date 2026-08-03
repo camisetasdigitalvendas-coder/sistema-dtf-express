@@ -185,7 +185,6 @@ with aba_vendas:
         soma_total_filtro = df_ativos["valor_total"].sum()
         st.markdown(f"<p style='font-size:15px; color:#0284c7; font-weight:700;'>💰 Total Pendente/Localizado nesta Busca: R$ {soma_total_filtro:,.2f}</p>", unsafe_allow_html=True)
         
-        # Lista Organizada de Linhas sem colunas aninhadas perigosas
         for idx, row in df_ativos.iterrows():
             id_p = int(row["id"])
             lbl_prod = "✨ PRONTO" if row.get("dtf_pronto", False) else "⏳ IMPRIMINDO"
@@ -197,9 +196,11 @@ with aba_vendas:
             lbl_ret = "📦 RETIROU" if row["retirou"] else "⏳ PENDENTE"
             cls_ret = "badge-info" if row["retirou"] else "badge-warning"
 
-            # Renderiza as informações principais do pedido
             st.markdown(f"👤 **{row['cliente']}** | Total: **R$ {row['valor_total']:,.2f}**")
             st.markdown(f"<span class='badge {cls_prod}'>{lbl_prod}</span> <span class='badge {cls_pago}'>{lbl_pago}</span> <span class='badge {cls_ret}'>{lbl_ret}</span>", unsafe_allow_html=True)
             st.markdown(f"<small style='color:gray;'>{row['metros']} un/m | Lançado em: {row['data'].strftime('%d/%m/%Y')} | Desc: R$ {row['desconto']} | Taxa: R$ {row['acrescimo']}</small>", unsafe_allow_html=True)
             
-            # Linha de Ações/Botões horizontais simples
+            col_b1, col_b2, col_b3, col_dl = st.columns([1, 1, 1, 0.3])
+            
+            if col_b1.button("Alternar DTF", key=f"b1_{id_p}"):
+                with conn.session as session:
