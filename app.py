@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from sqlalchemy import text  # Correção técnica importando a função text
+from sqlalchemy import text
 
 # 1. Configuração da página para PC e Celular
 st.set_page_config(layout="wide", page_title="Gestão DTF")
@@ -60,13 +60,14 @@ with st.form("formulario_pedido", clear_on_submit=True):
     cadastrar = st.form_submit_button("Inserir Pedido no Sistema")
     
     if cadastrar and cliente:
-        valor_total = metros * preco_metro
+        valor_total = float(metros * preco_metro)
         data_atual = hoje.strftime("%Y-%m-%d")
         
         with conn.session as session:
+            # Correção: Enviando os parâmetros convertidos explicitamente para formatos nativos
             session.execute(
                 text("INSERT INTO pedidos (data, cliente, metros, valor_total, pago, retirou) VALUES (:data, :cliente, :metros, :valor_total, false, false);"),
-                {"data": data_atual, "cliente": cliente, "metros": metros, "valor_total": valor_total}
+                {"data": str(data_atual), "cliente": str(cliente), "metros": float(metros), "valor_total": float(valor_total)}
             )
             session.commit()
         st.success(f"Pedido de {cliente} salvo na nuvem!")
