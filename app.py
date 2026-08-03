@@ -141,7 +141,7 @@ with aba_vendas:
         with c_acre:
             acrescimo = st.number_input("Acréscimo / Taxa (R$)", min_value=0.0, step=0.5, value=0.0)
             
-        c_space, c_btn = st.columns([5, 1])
+        c_space, c_btn = st.columns([5.5, 1.5])
         with c_btn:
             btn_salvar = st.form_submit_button("＋ Adicionar Item", use_container_width=True)
             
@@ -168,7 +168,7 @@ with aba_vendas:
     st.markdown("---")
     st.markdown("<h4 style='color:#334155; font-size:15px; font-weight:600; margin-bottom:15px;'>📋 Fila de Pedidos Ativos</h4>", unsafe_allow_html=True)
     
-    c_pesq, c_flt = st.columns()
+    c_pesq, c_flt = st.columns(2)
     with c_pesq:
         pesquisa = st.text_input("🔍 Procurar por Cliente", placeholder="Digite o nome do cliente para buscar e somar...")
     with c_flt:
