@@ -17,7 +17,7 @@ def buscar_dados():
 try:
     df_pedidos = buscar_dados()
 except Exception as e:
-    st.error("Erro ao conectar ao banco de dados. Verifique as configurações.")
+    st.error(f"Erro ao conectar ao banco de dados: {e}")
     df_pedidos = pd.DataFrame(columns=["id", "data", "cliente", "metros", "valor_total", "pago", "retirou"])
 
 # 4. Cálculos de Faturamento em Tempo Real (Dia e Mês)
@@ -61,17 +61,21 @@ with st.form("formulario_pedido", clear_on_submit=True):
     
     if cadastrar and cliente:
         valor_total = float(metros * preco_metro)
-        data_atual = hoje.strftime("%Y-%m-%d")
         
-        with conn.session as session:
-            # Correção: Enviando os parâmetros convertidos explicitamente para formatos nativos
-            session.execute(
-                text("INSERT INTO pedidos (data, cliente, metros, valor_total, pago, retirou) VALUES (:data, :cliente, :metros, :valor_total, false, false);"),
-                {"data": str(data_atual), "cliente": str(cliente), "metros": float(metros), "valor_total": float(valor_total)}
-            )
-            session.commit()
-        st.success(f"Pedido de {cliente} salvo na nuvem!")
-        st.rerun()
+        try:
+            with conn.session as session:
+                # Mudança: Usando parâmetros limpos e mapeados de forma ultra segura
+                sql = text("""
+                    INSERT INTO pedidos (data, cliente, metros, valor_total, pago, retirou) 
+                    VALUES (:dt, :cli, :met, :val, false, false);
+                """)
+                session.execute(sql, {"dt": hoje, "cli": str(cliente), "met": float(metros), "val": float(valor_total)})
+                session.commit()
+            st.success(f"Pedido de {cliente} salvo na nuvem!")
+            st.rerun()
+        except Exception as error:
+            # Proteção: Se falhar, mostra o erro na tela sem travar o app inteiro
+            st.error(f"Erro do Banco de Dados ao salvar: {error}")
 
 st.markdown("---")
 
@@ -88,14 +92,15 @@ if not df_pedidos.empty:
     )
 
     if st.button("💾 Salvar Alterações de Status"):
-        with conn.session as session:
-            for index, row in pedidos_editados.iterrows():
-                session.execute(
-                    text("UPDATE pedidos SET pago = :pago, retirou = :retirou WHERE id = :id;"),
-                    {"pago": bool(row["pago"]), "retirou": bool(row["retirou"]), "id": int(row["id"])}
-                )
-            session.commit()
-        st.success("Banco de dados atualizado para todos os usuários!")
-        st.rerun()
+        try:
+            with conn.session as session:
+                for index, row in pedidos_editados.iterrows():
+                    sql_update = text("UPDATE pedidos SET pago = :pago, retirou = :retirou WHERE id = :id;")
+                    session.execute(sql_update, {"pago": bool(row["pago"]), "retirou": bool(row["retirou"]), "id": int(row["id"])})
+                session.commit()
+            st.success("Banco de dados updated para todos os usuários!")
+            st.rerun()
+        except Exception as error_update:
+            st.error(f"Erro ao atualizar status: {error_update}")
 else:
     st.info("Nenhum pedido cadastrado ainda.")
